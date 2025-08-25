@@ -1,0 +1,87 @@
+services:
+  backend:
+    build: ./backend-laravel
+    container_name: ai-notes-backend
+    ports:
+      - "${BACKEND_PORT}:8000"
+    volumes:
+      - ./backend-laravel:/var/www
+      - /var/www/backend-laravel/vendor
+    depends_on:
+      - database
+    environment:
+      - DB_CONNECTION=${DB_CONNECTION}
+      - DB_HOST=${DB_HOST}
+      - DB_PORT=${DB_PORT}
+      - DB_DATABASE=${DB_DATABASE}
+      - DB_USERNAME=${DB_USERNAME}
+      - DB_PASSWORD=${DB_PASSWORD}
+    networks:
+      - ai-notes-network
+    command: php artisan serve --host=0.0.0.0 --port=8000
+
+  ai-service:
+    build: ./ai-service-python
+    container_name: ai-notes-ai-service
+    ports:
+      - "${AI_SERVICE_PORT}:8000"
+    volumes:
+      - ./ai-service-python:/app
+    environment:
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - ALLOWED_ORIGINS=${ALLOWED_ORIGINS}
+    networks:
+      - ai-notes-network
+
+  frontend:
+    build:
+      context: ./frontend-react
+      dockerfile: Dockerfile
+    container_name: ai-notes-frontend
+    ports:
+      - "${FRONTEND_PORT}:3000"
+    volumes:
+      - ./frontend-react:/app
+      - /app/node_modules
+    depends_on:
+      - backend
+    networks:
+      - ai-notes-network
+
+  database:
+    image: postgres:15
+    container_name: ai-notes-database
+    ports:
+      - "${DATABASE_PORT}:5432"
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - ai-notes-network
+
+  pgadmin:
+    image: dbeaver/cloudbeaver:latest
+    container_name: ai-notes-pgadmin
+    ports:
+      - "${PGADMIN_PORT}:8978"
+    environment:
+      - CB_DATABASE=postgres
+      - CB_DB_HOST=${DB_HOST}
+      - CB_DB_PORT=${DB_PORT}
+      - CB_DB_NAME=${POSTGRES_DB}
+      - CB_DB_USER=${POSTGRES_USER}
+      - CB_DB_PASSWORD=${POSTGRES_PASSWORD}
+    depends_on:
+      - database
+    networks:
+      - ai-notes-network
+
+volumes:
+  postgres_data:
+
+networks:
+  ai-notes-network:
+    driver: bridge
